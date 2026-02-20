@@ -155,11 +155,18 @@ def add_link(decision_id: int):
     except ValidationError as err:
         return jsonify({"errors": err.messages}), 422
 
+    # Validate that target decision exists and belongs to the same user
+    target_decision, target_err, target_code = _get_decision_or_404(data["target_id"], user_id)
+    if target_err:
+        return target_err, target_code
+
     try:
         decision_service.add_link(decision, data["target_id"], data["link_type"])
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 422
 
+    # Refresh the decision to include the new link in relationships
+    db.session.refresh(decision)
     return jsonify(decision_service.serialize_decision(decision)), 201
 
 

@@ -21,8 +21,8 @@ def _get_client():
     try:
         from openai import OpenAI  # type: ignore
         return OpenAI(api_key=api_key)
-    except ImportError:
-        logger.warning("openai package not installed; AI features disabled.")
+    except Exception as exc:
+        logger.warning("OpenAI client unavailable; AI features disabled: %s", exc)
         return None
 
 

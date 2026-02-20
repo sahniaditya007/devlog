@@ -85,6 +85,12 @@ class TestDecisionAPI:
         payload.update(overrides)
         return client.post("/api/decisions/", json=payload, headers=auth_headers)
 
+    def _get_auth_headers(self, client, user):
+        """Helper to get auth headers for a specific user."""
+        resp = client.post("/api/auth/login", json={"email": user.email, "password": "password123"})
+        token = resp.get_json()["token"]
+        return {"Authorization": f"Bearer {token}"}
+
     def test_create_decision_success(self, client, auth_headers, project):
         resp = self._create_decision(client, auth_headers, project.id)
         assert resp.status_code == 201
@@ -201,6 +207,46 @@ class TestDecisionAPI:
             headers=auth_headers,
         )
         assert resp.status_code == 422
+
+    def test_cannot_link_to_other_users_decision(self, client, db, user, project):
+        """Test that users cannot link to decisions from other users' projects."""
+        from app.models.user import User
+        from app.models.project import Project
+        from app.models.decision import Decision, DecisionStatus
+        
+        # Create a second user and project
+        other_user = User(email="other@example.com", name="Other User")
+        other_user.set_password("password123")
+        db.session.add(other_user)
+        db.session.commit()
+        
+        other_project = Project(name="Other Project", owner_id=other_user.id)
+        db.session.add(other_project)
+        db.session.commit()
+        
+        # Create decisions: one for current user, one for other user
+        auth_headers = self._get_auth_headers(client, user)
+        d1 = self._create_decision(client, auth_headers, project.id).get_json()
+        d2 = Decision(
+            title="Other User Decision",
+            context="Context",
+            decision_text="Decision text",
+            project_id=other_project.id,
+            author_id=other_user.id,
+            status=DecisionStatus.PROPOSED,
+            tags=[],
+        )
+        db.session.add(d2)
+        db.session.commit()
+        
+        # Try to link current user's decision to other user's decision
+        resp = client.post(
+            f"/api/decisions/{d1['id']}/links",
+            json={"target_id": d2.id, "link_type": "relates_to"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 403  # Access denied
+        assert "Access denied" in resp.get_json()["error"]
 
     def test_search_decisions(self, client, auth_headers, project):
         self._create_decision(client, auth_headers, project.id, title="Redis caching strategy")
