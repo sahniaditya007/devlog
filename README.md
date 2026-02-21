@@ -4,6 +4,8 @@ A full-stack application for logging, tracking, and understanding architectural 
 
 ---
 
+Project Video Link: https://drive.google.com/file/d/14vbWgzt76DHyDmKj4mzVPzCh1jfehMR1/view?usp=sharing
+
 ## Quick Start
 
 ### Backend
